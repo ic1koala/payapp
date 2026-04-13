@@ -544,7 +544,7 @@ html, body {
   <div id="pauseOverlay">
     <div class="pause-text">⏸ いちじちゅうだん</div>
     <button class="btn btn-resume" onclick="resumeGame()">さいかい</button>
-    <button class="btn btn-restart" onclick="startGame()">さいしょからやりなおす</button>
+    <button class="btn btn-restart" onclick="goTitle()">さいしょにもどる</button>
     <button class="btn btn-share" onclick="shareApp()">🔗 このアプリを共有</button>
   </div>
   <div id="effectOverlay"></div>
@@ -573,8 +573,172 @@ html, body {
 
 <script>
 /* =============================================
+   AUDIO ENGINE (Web Audio API)
+============================================= */
+const AC = (() => {
+  try { return new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
+})();
+
+let bgmNodes = null;
+let bgmGain  = null;
+
+// ―― BGM: ルンルンメロディ (ループ) ――
+const BGM_BPM   = 140;
+const BGM_BEAT  = 60 / BGM_BPM;
+const SCALE     = [523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50]; // C5 major
+const BGM_SEQ   = [
+  [0,  4, 0.5],[0.5,4,0.25],[0.75,2,0.25],[1,5,0.5],[1.5,5,0.25],[1.75,4,0.25],
+  [2,  3, 0.5],[2.5,2,0.25],[2.75,1,0.25],[3,0,0.75],[3.75,0,0.25],
+  [4,  2, 0.5],[4.5,4,0.25],[4.75,5,0.25],[5,6,0.5],[5.5,5,0.25],[5.75,4,0.25],
+  [6,  3, 0.25],[6.25,2,0.25],[6.5,1,0.25],[6.75,0,0.25],[7,0,1.0]
+]; // 8拍の1フレーズ
+const BGM_BARS  = 8; // エンド位置 (bars * 8)
+
+function playBGM() {
+  if (!AC) return;
+  if (AC.state === 'suspended') AC.resume();
+  stopBGM();
+
+  bgmGain = AC.createGain();
+  bgmGain.gain.value = 0.18;
+  bgmGain.connect(AC.destination);
+
+  const loopDur = BGM_BARS * BGM_BEAT;
+  bgmNodes = [];
+
+  function scheduleLoop(startAt) {
+    BGM_SEQ.forEach(([beat, note, dur]) => {
+      const osc  = AC.createOscillator();
+      const env  = AC.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = SCALE[note];
+      osc.connect(env); env.connect(bgmGain);
+      const t = startAt + beat * BGM_BEAT;
+      const end = t + dur * BGM_BEAT * 0.85;
+      env.gain.setValueAtTime(0, t);
+      env.gain.linearRampToValueAtTime(1, t + 0.02);
+      env.gain.setValueAtTime(1, end - 0.04);
+      env.gain.linearRampToValueAtTime(0, end);
+      osc.start(t); osc.stop(end + 0.01);
+      bgmNodes.push(osc);
+    });
+    // ベースライン
+    [0,2,4,6].forEach(b => {
+      const osc  = AC.createOscillator();
+      const env  = AC.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = SCALE[b % SCALE.length] / 2;
+      osc.connect(env); env.connect(bgmGain);
+      const t = startAt + b * BGM_BEAT;
+      env.gain.setValueAtTime(0.5, t);
+      env.gain.linearRampToValueAtTime(0, t + BGM_BEAT * 0.8);
+      osc.start(t); osc.stop(t + BGM_BEAT + 0.05);
+      bgmNodes.push(osc);
+    });
+  }
+
+  // 初回 + ループ用に3回分先読み
+  for (let i = 0; i < 3; i++) scheduleLoop(AC.currentTime + i * loopDur);
+
+  // ループ管理
+  function keepLooping(lastStart) {
+    if (!bgmGain) return;
+    const nextStart = lastStart + 2 * loopDur;
+    const delay = (nextStart - AC.currentTime - 0.5) * 1000;
+    setTimeout(() => {
+      if (!bgmGain) return;
+      scheduleLoop(nextStart);
+      keepLooping(nextStart);
+    }, Math.max(delay, 100));
+  }
+  keepLooping(AC.currentTime);
+}
+
+function stopBGM() {
+  if (bgmNodes) { bgmNodes.forEach(n => { try { n.stop(); } catch {} }); bgmNodes = null; }
+  if (bgmGain)  { bgmGain.disconnect(); bgmGain = null; }
+}
+
+function pauseBGM() { if (AC && bgmGain) bgmGain.gain.linearRampToValueAtTime(0, AC.currentTime + 0.2); }
+function resumeBGM() { if (AC && bgmGain) bgmGain.gain.linearRampToValueAtTime(0.18, AC.currentTime + 0.2); }
+
+// ―― SFX: ボタンクリック ――
+function sfxButton() {
+  if (!AC) return;
+  if (AC.state === 'suspended') AC.resume();
+  const osc = AC.createOscillator();
+  const env = AC.createGain();
+  osc.connect(env); env.connect(AC.destination);
+  osc.type = 'sine'; osc.frequency.setValueAtTime(880, AC.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(660, AC.currentTime + 0.06);
+  env.gain.setValueAtTime(0.3, AC.currentTime);
+  env.gain.linearRampToValueAtTime(0, AC.currentTime + 0.08);
+  osc.start(); osc.stop(AC.currentTime + 0.1);
+}
+
+// ―― SFX: チャリン（支払い） ――
+function sfxCoin() {
+  if (!AC) return;
+  if (AC.state === 'suspended') AC.resume();
+  const freqs = [2093, 2637, 3136];
+  freqs.forEach((f, i) => {
+    const osc  = AC.createOscillator();
+    const env  = AC.createGain();
+    osc.connect(env); env.connect(AC.destination);
+    osc.type = 'sine'; osc.frequency.value = f;
+    const t = AC.currentTime + i * 0.05;
+    env.gain.setValueAtTime(0.25, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    osc.start(t); osc.stop(t + 0.42);
+  });
+}
+
+// ―― SFX: 成功ファンファー ――
+function sfxSuccess() {
+  if (!AC) return;
+  if (AC.state === 'suspended') AC.resume();
+  [[523,0],[659,0.1],[784,0.2],[1047,0.3]].forEach(([f, t]) => {
+    const osc = AC.createOscillator();
+    const env = AC.createGain();
+    osc.connect(env); env.connect(AC.destination);
+    osc.type = 'triangle'; osc.frequency.value = f;
+    const at = AC.currentTime + t;
+    env.gain.setValueAtTime(0.3, at);
+    env.gain.linearRampToValueAtTime(0, at + 0.18);
+    osc.start(at); osc.stop(at + 0.2);
+  });
+}
+
+// ―― SFX: ペナルティブズー ――
+function sfxPenalty() {
+  if (!AC) return;
+  if (AC.state === 'suspended') AC.resume();
+  const osc  = AC.createOscillator();
+  const env  = AC.createGain();
+  osc.connect(env); env.connect(AC.destination);
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(220, AC.currentTime);
+  osc.frequency.linearRampToValueAtTime(110, AC.currentTime + 0.3);
+  env.gain.setValueAtTime(0.25, AC.currentTime);
+  env.gain.linearRampToValueAtTime(0, AC.currentTime + 0.35);
+  osc.start(); osc.stop(AC.currentTime + 0.38);
+}
+
+// ボタン全体にクリック音を付ける
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.btn').forEach(btn => {
+    btn.addEventListener('pointerdown', () => sfxButton(), {passive: true});
+  });
+  // コイン・紙幣をクリックしたときも短い音
+  document.addEventListener('pointerdown', e => {
+    if (e.target.closest('.money-item, .coin, .bill') && !e.target.closest('.btn')) sfxButton();
+  }, {passive: true});
+});
+
+/* =============================================
    CONSTANTS
 ============================================= */
+
 const INITIAL_WALLET = { 1000:1, 500:0, 100:5, 50:1, 10:10 };
 const DENOMS = [10, 50, 100, 500, 1000];
 const RANKS = [
@@ -650,6 +814,9 @@ function showScreen(id) {
 }
 function goTitle() {
   clearInterval(timerID);
+  stopBGM();
+  paused = false;
+  document.getElementById('pauseOverlay').classList.remove('show');
   showScreen('titleScreen');
   renderRanking();
 }
@@ -851,29 +1018,30 @@ function pay() {
     // ピッタリ！
     const pts = 80 + Math.min(elapsedSec, 60);
     score += pts;
-    timeLeft += 10; updateTimerDisplay(); // changeTimeを使わず直接(ポップアップを二重に出さないため)
+    timeLeft += 10; updateTimerDisplay();
     updateScore();
+    sfxCoin(); sfxSuccess();
     flashEffect('ピッタリ！！ ＋' + pts + 'てん<br><span style="font-size:0.6em">＋10びょう ついか！</span>', 'effect-pittari', true);
     generateQuestion();
   } else if (!couldBeExact) {
-    // ぴったりにできなかった（こぜにが足りない）→ 必然的な多払い：ペナルティなし
     const pts = 15;
     score += pts;
     updateScore();
+    sfxCoin();
     flashEffect('こぜにチャージ！！ ＋' + pts + 'てん', 'effect-safe', false);
     generateQuestion();
   } else if (ratio <= 0.30) {
-    // ぴったりにできたのに30%以内の多払い → セーフ（小銭チャージ）
     const pts = 25;
     score += pts;
     updateScore();
+    sfxCoin();
     flashEffect('こぜにチャージ！！ ＋' + pts + 'てん', 'effect-safe', false);
     generateQuestion();
   } else {
-    // ぴったりにできたのに31%以上多払い → ペナルティ
     score = Math.max(0, score - 10);
     timeLeft = Math.max(0, timeLeft - 15); updateTimerDisplay();
     updateScore();
+    sfxPenalty();
     flashEffect('はらいすぎだよ！<br><span style="font-size:0.6em">−15びょう マイナス！</span>', 'effect-penalty', false);
     generateQuestion();
   }
@@ -933,8 +1101,8 @@ function startTimer() {
 /* =============================================
    PAUSE
 ============================================= */
-function pauseGame()  { paused=true;  document.getElementById('pauseOverlay').classList.add('show'); }
-function resumeGame() { paused=false; document.getElementById('pauseOverlay').classList.remove('show'); }
+function pauseGame()  { paused=true;  document.getElementById('pauseOverlay').classList.add('show'); pauseBGM(); }
+function resumeGame() { paused=false; document.getElementById('pauseOverlay').classList.remove('show'); resumeBGM(); }
 
 /* =============================================
    EFFECTS
@@ -986,10 +1154,13 @@ function startGame() {
   generateQuestion();
   showScreen('playScreen');
   startTimer();
+  // BGM開始（スクリーン切り替え後少し遅らせてAudioContextを起動）
+  setTimeout(() => playBGM(), 300);
 }
 
 function endGame(reason) {
   clearInterval(timerID);
+  stopBGM();
   saveRanking(score);
   const info = getRankInfo(score);
   document.getElementById('finalScore').textContent = score;
