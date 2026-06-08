@@ -478,6 +478,85 @@ html, body {
   100% { box-shadow: 0 0 0 0 rgba(126,87,194,0); }
 }
 .refill-flash { animation: refillFlash 0.5s ease-out; }
+
+/* Combo badge styling */
+.combo-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #FF1493, #FF4500);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 900;
+  padding: 4px 10px;
+  border-radius: 999px;
+  box-shadow: 0 4px 10px rgba(255,20,147,0.4);
+  margin-left: 8px;
+  animation: comboPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  white-space: nowrap;
+}
+@keyframes comboPop {
+  0% { transform: scale(0.5) rotate(-15deg); }
+  70% { transform: scale(1.2) rotate(10deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+/* Mission banner styling */
+.mission-banner {
+  background: linear-gradient(135deg, #9C27B0, #E91E63);
+  color: #fff;
+  font-weight: 900;
+  font-size: 0.82rem;
+  padding: 6px 12px;
+  border-radius: 12px;
+  margin-top: 6px;
+  box-shadow: 0 4px 10px rgba(156,39,176,0.3);
+  border: 2px solid #FFEB3B;
+  animation: pulse 1.5s infinite;
+  text-align: center;
+}
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+/* Level container styles */
+.level-container {
+  background: var(--clr-panel);
+  border-radius: 14px;
+  padding: 10px 16px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: var(--shadow);
+  text-align: center;
+  margin: 10px auto;
+}
+.level-label {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--clr-pDark);
+}
+.exp-bar-wrap {
+  width: 100%;
+  height: 14px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 99px;
+  margin-top: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.1);
+  position: relative;
+}
+.exp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FFB74D, #FF5722);
+  border-radius: 99px;
+  transition: width 0.5s ease-out;
+}
+.exp-text {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #795548;
+  margin-top: 4px;
+}
 </style>
 </head>
 <body>
@@ -488,6 +567,13 @@ html, body {
     <div class="title-man">🧑‍💼</div>
     <div class="title-text">おつりべんきょうマン</div>
     <div class="title-sub">おかいものにいこう！</div>
+  </div>
+  <div class="level-container" id="titleLevelContainer">
+    <div class="level-label">⭐ レベル <span id="titleLevelVal">1</span></div>
+    <div class="exp-bar-wrap">
+      <div class="exp-bar-fill" id="titleExpBar" style="width: 0%"></div>
+    </div>
+    <div class="exp-text"><span id="titleExpVal">0</span> / <span id="titleNextExpVal">100</span> EXP</div>
   </div>
   <button class="btn btn-start" onclick="startGame()">スタート！</button>
   <div class="ranking-panel">
@@ -507,7 +593,7 @@ html, body {
     <div class="session-bar-wrap" title="のこりじかん">
       <div class="session-bar-fill" id="sessionBar" style="width:100%"></div>
     </div>
-    <div class="score-box">⭐ <span id="scoreVal">0</span>てん</div>
+    <div class="score-box">⭐ <span id="scoreVal">0</span>てん<span id="comboBadge" class="combo-badge" style="display:none;">0コンボ</span></div>
     <button class="btn pause-btn" onclick="pauseGame()">▐▐</button>
   </div>
 
@@ -518,6 +604,7 @@ html, body {
       おだいは<br>
       <span class="price-em" id="priceDisplay">—</span>えんだよ！<br>
       <span class="diff-badge diff-1" id="diffBadge">かんたん</span>
+      <div id="missionDisplay" class="mission-banner" style="display:none;"></div>
     </div>
   </div>
 
@@ -536,7 +623,7 @@ html, body {
       <span class="wallet-label">👛 じぶんのさいふ</span>
       <span class="wallet-total" id="walletTotal">0えん</span>
       <span class="wallet-spacer"></span>
-      <button class="refill-btn btn" id="refillBtn" onclick="refillCoins()">＋こぜにほじゅう</button>
+      <button class="refill-btn btn" id="refillBtn" onclick="refillCoins()">＋おかねほじゅう</button>
     </div>
     <div class="money-grid" id="walletGrid"></div>
   </div>
@@ -559,6 +646,15 @@ html, body {
     <div class="result-score" id="finalScore">0</div>
     <div class="result-unit">てん</div>
     <div class="result-rank" id="finalRank">ランクなし</div>
+    
+    <div class="level-container" id="resultLevelContainer" style="margin-top: 15px;">
+      <div class="level-label">⭐ レベル <span id="resultLevelVal">1</span></div>
+      <div class="exp-bar-wrap">
+        <div class="exp-bar-fill" id="resultExpBar" style="width: 0%"></div>
+      </div>
+      <div class="exp-text"><span id="resultExpVal">0</span> / <span id="resultNextExpVal">100</span> EXP (あと <span id="resultNeededExpVal">100</span> EXP)</div>
+      <div id="levelUpText" style="display:none; color: #E91E63; font-weight: 900; font-size: 1.1rem; margin-top: 6px; animation: comboPop 0.5s ease-out infinite alternate;">レベルアップ！🎉</div>
+    </div>
   </div>
   <button class="btn btn-back" onclick="goTitle()">タイトルへもどる</button>
 </div>
@@ -772,6 +868,8 @@ let timerID = null, paused = false;
 let currentPrice = 0, questionCount = 0;
 let gameStartTime = 0;   // Date.now() at game start
 let elapsedSec    = 0;   // seconds elapsed since game start
+let comboCount    = 0;
+let activeMission = null;
 
 /* =============================================
    UTILS
@@ -806,6 +904,47 @@ function canMakeExact(target, combined) {
 }
 
 /* =============================================
+   EXP & LEVEL SYSTEM
+============================================= */
+function getLevelInfo(totalExp) {
+  let level = 1;
+  let exp = totalExp;
+  while (true) {
+    let req = level * 100;
+    if (exp >= req) {
+      exp -= req;
+      level++;
+    } else {
+      break;
+    }
+  }
+  let reqForNext = level * 100;
+  return { level, currentLevelExp: exp, nextLevelExp: reqForNext };
+}
+
+function updateLevelUI(containerPrefix, totalExp) {
+  const info = getLevelInfo(totalExp);
+  const lvlVal = document.getElementById(containerPrefix + 'LevelVal');
+  const expBar = document.getElementById(containerPrefix + 'ExpBar');
+  const expVal = document.getElementById(containerPrefix + 'ExpVal');
+  const nextExpVal = document.getElementById(containerPrefix + 'NextExpVal');
+  
+  if (lvlVal) lvlVal.textContent = info.level;
+  if (expBar) {
+    const pct = (info.currentLevelExp / info.nextLevelExp) * 100;
+    expBar.style.width = pct + '%';
+  }
+  if (expVal) expVal.textContent = info.currentLevelExp;
+  if (nextExpVal) nextExpVal.textContent = info.nextLevelExp;
+  
+  // For result screen specifically:
+  const neededVal = document.getElementById('resultNeededExpVal');
+  if (neededVal) {
+    neededVal.textContent = info.nextLevelExp - info.currentLevelExp;
+  }
+}
+
+/* =============================================
    SCREENS
 ============================================= */
 function showScreen(id) {
@@ -819,6 +958,10 @@ function goTitle() {
   document.getElementById('pauseOverlay').classList.remove('show');
   showScreen('titleScreen');
   renderRanking();
+  
+  // Load and display level
+  const totalExp = parseInt(localStorage.getItem('otsuri_total_exp') || '0', 10);
+  updateLevelUI('title', totalExp);
 }
 
 /* =============================================
@@ -884,6 +1027,50 @@ function generateQuestion() {
   document.getElementById('priceDisplay').textContent = currentPrice.toLocaleString();
   updateDiffBadge();
   questionCount++;
+
+  // --- SPECIAL MISSION LOGIC ---
+  activeMission = null;
+  const missionDisplay = document.getElementById('missionDisplay');
+  missionDisplay.style.display = 'none';
+
+  // 25% chance of a mission
+  if (Math.random() < 0.25) {
+    const missions = [];
+    
+    // Mission 1: No 100-yen coins
+    missions.push({
+      type: 'no_100',
+      text: '⭐100えんだまを つかわない！',
+      check: (t, p, c) => (t[100] || 0) === 0
+    });
+
+    // Mission 2: Use 1000-yen bill (if combined total includes at least one 1000-yen bill)
+    const combined1000 = (wallet[1000]||0) + (tray[1000]||0);
+    if (combined1000 > 0 && currentPrice <= combined1000 * 1000) {
+      missions.push({
+        type: 'use_1000',
+        text: '⭐1000えんさつを つかう！',
+        check: (t, p, c) => (t[1000] || 0) > 0
+      });
+    }
+
+    // Mission 3: Exact change (ピッタリ)
+    const combined = {};
+    DENOMS.forEach(d => { combined[d] = (wallet[d]||0) + (tray[d]||0); });
+    if (canMakeExact(currentPrice, combined)) {
+      missions.push({
+        type: 'exact',
+        text: '⭐ピッタリ はらう！',
+        check: (t, p, c) => p === c
+      });
+    }
+
+    if (missions.length > 0) {
+      activeMission = missions[Math.floor(Math.random() * missions.length)];
+      missionDisplay.textContent = activeMission.text;
+      missionDisplay.style.display = 'block';
+    }
+  }
 }
 
 /* =============================================
@@ -954,10 +1141,12 @@ function moveToWallet(d) {
    REFILL BUTTON
 ============================================= */
 function refillCoins() {
-  // 小銭の補充（10円×10、50円×2、100円×3 を追加）
-  wallet[10]  = (wallet[10]||0)  + 10;
-  wallet[50]  = (wallet[50]||0)  + 2;
-  wallet[100] = (wallet[100]||0) + 3;
+  // お金の補充（10円×10、50円×2、100円×3、500円×1、1000円×1 を追加）
+  wallet[10]   = (wallet[10]||0)   + 10;
+  wallet[50]   = (wallet[50]||0)   + 2;
+  wallet[100]  = (wallet[100]||0)  + 3;
+  wallet[500]  = (wallet[500]||0)  + 1;
+  wallet[1000] = (wallet[1000]||0) + 1;
   renderWallet();
   // 視覚フィードバック
   const btn = document.getElementById('refillBtn');
@@ -965,7 +1154,7 @@ function refillCoins() {
   btn.textContent = '✓ ほじゅうした！';
   setTimeout(() => {
     btn.classList.remove('refill-flash');
-    btn.textContent = '＋こぜにほじゅう';
+    btn.textContent = '＋おかねほじゅう';
   }, 900);
 }
 
@@ -1007,6 +1196,12 @@ function pay() {
   DENOMS.forEach(d => { combined[d] = (wallet[d]||0) + (tray[d]||0); });
   const couldBeExact = canMakeExact(currentPrice, combined);
 
+  // ミッション成否の判定（トレイをクリアする前に行う）
+  let missionSuccess = false;
+  if (activeMission) {
+    missionSuccess = activeMission.check(tray, paid, currentPrice);
+  }
+
   // 支払い済み → trayをクリア
   DENOMS.forEach(d => { tray[d] = 0; });
   // お釣りをお財布へ
@@ -1014,35 +1209,94 @@ function pay() {
   renderWallet();
   renderTray();
 
+  let paymentValid = false;
+  let pts = 0;
+  let effectCls = 'effect-safe';
+  let message = '';
+  let addTime = 0;
+  let isPittari = false;
+
   if (ratio === 0) {
     // ピッタリ！
-    const pts = 80 + Math.min(elapsedSec, 60);
-    score += pts;
-    timeLeft += 10; updateTimerDisplay();
-    updateScore();
-    sfxCoin(); sfxSuccess();
-    flashEffect('ピッタリ！！ ＋' + pts + 'てん<br><span style="font-size:0.6em">＋10びょう ついか！</span>', 'effect-pittari', true);
-    generateQuestion();
+    paymentValid = true;
+    isPittari = true;
+    pts = 80 + Math.min(elapsedSec, 60);
+    addTime = 10;
+    effectCls = 'effect-pittari';
+    message = 'ピッタリ！！ ＋' + pts + 'てん';
   } else if (!couldBeExact) {
-    const pts = 15;
-    score += pts;
-    updateScore();
-    sfxCoin();
-    flashEffect('こぜにチャージ！！ ＋' + pts + 'てん', 'effect-safe', false);
-    generateQuestion();
+    paymentValid = true;
+    pts = 15;
+    message = 'こぜにチャージ！！ ＋' + pts + 'てん';
   } else if (ratio <= 0.30) {
-    const pts = 25;
+    paymentValid = true;
+    pts = 25;
+    message = 'こぜにチャージ！！ ＋' + pts + 'てん';
+  } else {
+    // はらいすぎペナルティ
+    paymentValid = false;
+    pts = -10;
+    addTime = -15;
+    effectCls = 'effect-penalty';
+    message = 'はらいすぎだよ！<br><span style="font-size:0.6em">−15びょう マイナス！</span>';
+  }
+
+  if (paymentValid) {
+    comboCount++;
+    // コンボボーナス
+    let comboBonus = 0;
+    if (comboCount >= 2) {
+      comboBonus = comboCount * 5;
+      pts += comboBonus;
+      message += `<br><span style="font-size:0.7em; color:#FFF8E1">${comboCount}コンボ！ (＋${comboBonus}てん)</span>`;
+    }
+    
+    // ミッションボーナス
+    if (activeMission) {
+      if (missionSuccess) {
+        pts += 50;
+        message += '<br><span style="font-size:0.75em; color:#FFD93D">⭐ミッションせいこう！ ＋50てん</span>';
+        sfxSuccess();
+      } else {
+        message += '<br><span style="font-size:0.65em; color:#ECEFF1">ミッションしっぱい...</span>';
+      }
+    }
+
     score += pts;
+    if (addTime !== 0) timeLeft += addTime;
+    
+    updateTimerDisplay();
     updateScore();
-    sfxCoin();
-    flashEffect('こぜにチャージ！！ ＋' + pts + 'てん', 'effect-safe', false);
+    
+    if (isPittari) {
+      sfxCoin(); sfxSuccess();
+    } else {
+      sfxCoin();
+    }
+    
+    // コンボUI更新
+    const comboBadge = document.getElementById('comboBadge');
+    comboBadge.textContent = comboCount + 'コンボ';
+    comboBadge.style.display = comboCount >= 2 ? 'inline-block' : 'none';
+    
+    flashEffect(message, effectCls, isPittari);
     generateQuestion();
   } else {
-    score = Math.max(0, score - 10);
-    timeLeft = Math.max(0, timeLeft - 15); updateTimerDisplay();
+    comboCount = 0;
+    document.getElementById('comboBadge').style.display = 'none';
+
+    score = Math.max(0, score + pts);
+    if (addTime !== 0) timeLeft = Math.max(0, timeLeft + addTime);
+    
+    updateTimerDisplay();
     updateScore();
     sfxPenalty();
-    flashEffect('はらいすぎだよ！<br><span style="font-size:0.6em">−15びょう マイナス！</span>', 'effect-penalty', false);
+    
+    if (activeMission) {
+      message += '<br><span style="font-size:0.65em; color:#ECEFF1">ミッションしっぱい...</span>';
+    }
+
+    flashEffect(message, effectCls, false);
     generateQuestion();
   }
 }
@@ -1147,6 +1401,11 @@ function startGame() {
   elapsedSec    = 0;
   paused        = false;
   gameStartTime = Date.now();
+  comboCount    = 0;
+  activeMission = null;
+
+  document.getElementById('comboBadge').style.display = 'none';
+  document.getElementById('missionDisplay').style.display = 'none';
 
   renderWallet(); renderTray();
   updateTimerDisplay(); updateScore();
@@ -1167,6 +1426,25 @@ function endGame(reason) {
   document.getElementById('finalRank').textContent  = info.name;
   document.getElementById('resultChar').textContent  = info.char;
   document.getElementById('resultReason').textContent = reason || '';
+  
+  // 累積経験値（EXP）の更新とレベルアップ処理
+  const oldTotalExp = parseInt(localStorage.getItem('otsuri_total_exp') || '0', 10);
+  const newTotalExp = oldTotalExp + score;
+  localStorage.setItem('otsuri_total_exp', newTotalExp.toString());
+  
+  const oldLevelInfo = getLevelInfo(oldTotalExp);
+  const newLevelInfo = getLevelInfo(newTotalExp);
+  
+  updateLevelUI('result', newTotalExp);
+  
+  const levelUpText = document.getElementById('levelUpText');
+  if (newLevelInfo.level > oldLevelInfo.level) {
+    levelUpText.style.display = 'block';
+    levelUpText.textContent = `レベルアップ！ Lv${oldLevelInfo.level} ➔ Lv${newLevelInfo.level} 🎉`;
+  } else {
+    levelUpText.style.display = 'none';
+  }
+  
   showScreen('resultScreen');
 }
 
@@ -1235,6 +1513,9 @@ lockEl.addEventListener('mouseup',   e => {
    INIT
 ============================================= */
 renderRanking();
+// 初期レベル表示
+const totalExp = parseInt(localStorage.getItem('otsuri_total_exp') || '0', 10);
+updateLevelUI('title', totalExp);
 </script>
 </body>
 </html>
