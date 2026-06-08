@@ -557,6 +557,23 @@ html, body {
   color: #795548;
   margin-top: 4px;
 }
+
+.title-logo-img {
+  width: 130px;
+  height: 130px;
+  object-fit: contain;
+  margin-bottom: 5px;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+}
+.btn-howtoplay {
+  background: linear-gradient(135deg, #FFB74D, #FFA726);
+  color: #795548;
+  font-size: 1.1rem;
+  padding: 10px 32px;
+  box-shadow: 0 4px 0 #E65100;
+  margin-top: 10px;
+}
+.btn-howtoplay:active { box-shadow: 0 1px 0 #E65100; transform: translateY(3px); }
 </style>
 </head>
 <body>
@@ -564,7 +581,7 @@ html, body {
 <!-- TITLE -->
 <div id="titleScreen" class="screen active">
   <div class="title-logo">
-    <div class="title-man">🧑‍💼</div>
+    <img src="logo.png" alt="おつりべんきょうマン" class="title-logo-img">
     <div class="title-text">おつりべんきょうマン</div>
     <div class="title-sub">おかいものにいこう！</div>
   </div>
@@ -576,6 +593,7 @@ html, body {
     <div class="exp-text"><span id="titleExpVal">0</span> / <span id="titleNextExpVal">100</span> EXP</div>
   </div>
   <button class="btn btn-start" onclick="startGame()">スタート！</button>
+  <button class="btn btn-howtoplay" onclick="showHowToPlay()">あそびかた</button>
   <div class="ranking-panel">
     <div class="ranking-title">🏆 ハイスコアランキング</div>
     <ul class="rank-list" id="rankingList"></ul>
@@ -602,6 +620,7 @@ html, body {
     <div class="shop-char">🧑‍🍳</div>
     <div class="speech-bubble">
       おだいは<br>
+      <span id="itemDisplay" style="font-size:0.92rem; font-weight:900; color:#795548;"></span><br>
       <span class="price-em" id="priceDisplay">—</span>えんだよ！<br>
       <span class="diff-badge diff-1" id="diffBadge">かんたん</span>
       <div id="missionDisplay" class="mission-banner" style="display:none;"></div>
@@ -855,6 +874,29 @@ const DIFF_STAGES = [
   { sec:120, maxPrice:1500, unit:10, label:'ちょうなんかん', cls:'diff-5' }
 ];
 
+const ITEMS = [
+  // 10-80 yen
+  { min: 10, max: 80, name: 'あめ', emoji: '🍬' },
+  { min: 10, max: 80, name: 'ちょこれーと', emoji: '🍫' },
+  { min: 10, max: 80, name: 'くっきー', emoji: '🍪' },
+  { min: 10, max: 80, name: 'ぽてとちっぷす', emoji: '🥔' },
+  // 90-300 yen
+  { min: 90, max: 300, name: 'りんご', emoji: '🍎' },
+  { min: 90, max: 300, name: 'ぎゅうにゅう', emoji: '🥛' },
+  { min: 90, max: 300, name: 'ぱん', emoji: '🍞' },
+  { min: 90, max: 300, name: 'じゅーす', emoji: '🍹' },
+  // 310-600 yen
+  { min: 310, max: 600, name: 'けーき', emoji: '🍰' },
+  { min: 310, max: 600, name: 'はんばーがー', emoji: '🍔' },
+  { min: 310, max: 600, name: 'ずかん', emoji: '📕' },
+  { min: 310, max: 600, name: 'のーと', emoji: '📓' },
+  // 610-1500 yen
+  { min: 610, max: 1500, name: 'ぬいぐるみ', emoji: '🧸' },
+  { min: 610, max: 1500, name: 'げーむ', emoji: '🎮' },
+  { min: 610, max: 1500, name: 'ぼーる', emoji: '⚽' },
+  { min: 610, max: 1500, name: 'おもちゃ', emoji: '🤖' }
+];
+
 const INIT_SECONDS     = 30;   // ゲーム開始タイム
 const MAX_SESSION_SEC  = 180;  // 最大3分でオートエンド
 const LOCK_MS          = 10 * 60 * 1000; // チャイルドロック10分
@@ -870,6 +912,7 @@ let gameStartTime = 0;   // Date.now() at game start
 let elapsedSec    = 0;   // seconds elapsed since game start
 let comboCount    = 0;
 let activeMission = null;
+let currentItem   = null;
 
 /* =============================================
    UTILS
@@ -942,6 +985,45 @@ function updateLevelUI(containerPrefix, totalExp) {
   if (neededVal) {
     neededVal.textContent = info.nextLevelExp - info.currentLevelExp;
   }
+}
+
+/* =============================================
+   SUKKIRI PAYMENT LOGIC
+============================================= */
+function isSukkiriPayment(price, traySnapshot, diff) {
+  if (diff <= 0) return false;
+
+  const countChangeCoins = (amount) => {
+    let rem = amount;
+    let count = 0;
+    [500, 100, 50, 10].forEach(d => {
+      const n = Math.floor(rem / d);
+      if (n > 0) {
+        count += n;
+        rem -= n * d;
+      }
+    });
+    return count;
+  };
+
+  const actualChangeCoins = countChangeCoins(diff);
+  const snapshotTotal = DENOMS.reduce((s, denom) => s + denom * (traySnapshot[denom] || 0), 0);
+
+  let isSukkiri = false;
+  [10, 50, 100].forEach(d => {
+    if ((traySnapshot[d] || 0) > 0) {
+      const altPaid = snapshotTotal - d;
+      if (altPaid >= price) {
+        const altDiff = altPaid - price;
+        const altChangeCoins = countChangeCoins(altDiff);
+        if (actualChangeCoins < altChangeCoins) {
+          isSukkiri = true;
+        }
+      }
+    }
+  });
+
+  return isSukkiri;
 }
 
 /* =============================================
@@ -1024,6 +1106,12 @@ function generateQuestion() {
   }
   if (!price || price < unit || price > total) price = unit;
   currentPrice = price;
+
+  // 商品の選定
+  const filteredItems = ITEMS.filter(item => price >= item.min && price <= item.max);
+  currentItem = filteredItems[Math.floor(Math.random() * filteredItems.length)] || { name: 'おかいもの', emoji: '🛍️' };
+  
+  document.getElementById('itemDisplay').textContent = `${currentItem.name} (${currentItem.emoji})`;
   document.getElementById('priceDisplay').textContent = currentPrice.toLocaleString();
   updateDiffBadge();
   questionCount++;
@@ -1206,6 +1294,9 @@ function pay() {
     missionSuccess = activeMission.check(tray, paid, currentPrice);
   }
 
+  // トレイのコピーを取る（スッキリ支払い判定用）
+  const traySnapshot = deepCopy(tray);
+
   // 支払い済み → trayをクリア
   DENOMS.forEach(d => { tray[d] = 0; });
   // お釣りをお財布へ
@@ -1261,6 +1352,13 @@ function pay() {
       comboBonus = comboCount * 5;
       pts += comboBonus;
       message += `<br><span style="font-size:0.7em; color:#FFF8E1">${comboCount}コンボ！ (＋${comboBonus}てん)</span>`;
+    }
+
+    // こぜにスッキリボーナス
+    const isSukkiri = isSukkiriPayment(currentPrice, traySnapshot, diff);
+    if (isSukkiri) {
+      pts += 30;
+      message += '<br><span style="font-size:0.75em; color:#6BCB77">👛こぜにスッキリ！ ＋30てん</span>';
     }
     
     // ミッションボーナス
@@ -1521,6 +1619,13 @@ lockEl.addEventListener('mouseup',   e => {
   swipeStartY=null;
 });
 
+function showHowToPlay() {
+  document.getElementById('howToPlayOverlay').style.display = 'flex';
+}
+function hideHowToPlay() {
+  document.getElementById('howToPlayOverlay').style.display = 'none';
+}
+
 /* =============================================
    INIT
 ============================================= */
@@ -1529,5 +1634,31 @@ renderRanking();
 const totalExp = parseInt(localStorage.getItem('otsuri_total_exp') || '0', 10);
 updateLevelUI('title', totalExp);
 </script>
+
+<!-- HOW TO PLAY OVERLAY -->
+<div id="howToPlayOverlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+  <div style="background: #FFF5E6; border: 4px solid #FF6B35; border-radius: 20px; padding: 22px; max-width: 450px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; font-family: 'Zen Maru Gothic', sans-serif;">
+    <h2 style="font-size: 1.4rem; color: #D94F1E; margin-bottom: 15px; font-weight: 900;">🎮 あそびかた</h2>
+    <div style="text-align: left; font-size: 0.9rem; line-height: 1.7; color: #3E2A0F; margin-bottom: 20px; font-weight: 700; max-height: 280px; overflow-y: auto; border-bottom: 2px dashed #FFD93D; padding-bottom: 15px;">
+      <p style="margin-bottom: 10px;"><strong>１. おかねを はらおう！</strong><br>
+      おみせの ひとに いわれた おかねを、おさいふの コインや おさつを タップして トレイに のせてね。<br>
+      「これではらう！」ボタンを おすと はらえるよ。</p>
+      
+      <p style="margin-bottom: 10px;"><strong>２. ピッタリ はらうと ボーナス！</strong><br>
+      おつりが ないように ピッタリ はらうと、タイムが ふえて スコアも たくさん もらえるよ！</p>
+      
+      <p style="margin-bottom: 10px;"><strong>３. こぜにスッキリ ボーナス！</strong><br>
+      おつりの コインが すくなくなるように くふうして はらうと、ボーナスが もらえるよ！</p>
+      
+      <p style="margin-bottom: 10px;"><strong>４. ミッションに ちょうせん！</strong><br>
+      「100えんだまを つかわない」などの ミッションが でたら、クリアできるように はらおう！</p>
+      
+      <p style="margin-bottom: 10px;"><strong>５. レベルアップ！</strong><br>
+      ゲームの スコアで レベルが あがっていくよ！</p>
+    </div>
+    <button class="btn" style="background: linear-gradient(135deg, var(--clr-primary), var(--clr-pDark)); color: #fff; padding: 10px 40px; font-size: 1.1rem; border-radius: 999px; font-weight: 900; box-shadow: 0 4px 0 var(--clr-pDark); border: none; cursor: pointer;" onclick="hideHowToPlay()">とじる</button>
+  </div>
+</div>
+
 </body>
 </html>
