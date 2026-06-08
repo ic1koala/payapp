@@ -1220,6 +1220,8 @@ function pay() {
   let addTime = 0;
   let isPittari = false;
 
+  const isMissionCleared = activeMission && missionSuccess;
+
   if (ratio === 0) {
     // ピッタリ！
     paymentValid = true;
@@ -1228,6 +1230,12 @@ function pay() {
     addTime = 10;
     effectCls = 'effect-pittari';
     message = 'ピッタリ！！ ＋' + pts + 'てん';
+  } else if (isMissionCleared) {
+    // ミッション達成時は、払いすぎペナルティをバイパスして正解とする
+    paymentValid = true;
+    pts = 40;
+    effectCls = 'effect-safe';
+    message = 'ミッションクリアしはらい！ ＋' + pts + 'てん';
   } else if (!couldBeExact) {
     paymentValid = true;
     pts = 15;
