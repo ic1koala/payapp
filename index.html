@@ -1087,9 +1087,13 @@ function makeCoinEl(d) {
   const info = COIN_INFO[d];
   const el = document.createElement('div');
   el.className = info.cls;
-  el.innerHTML = d === 500
-    ? `<div class="coin-inner-ring"></div><span style="position:relative;z-index:1;">${info.label}</span>`
-    : `<span>${info.label}</span>`;
+  if (d === 500) {
+    el.innerHTML = `<div class="coin-inner-ring"></div><span style="position:relative;z-index:1;">${info.label}</span>`;
+  } else if (d === 50) {
+    el.innerHTML = `<span style="position:relative;z-index:1;">${info.label}</span>`;
+  } else {
+    el.innerHTML = `<span>${info.label}</span>`;
+  }
   return el;
 }
 function renderWallet() {
